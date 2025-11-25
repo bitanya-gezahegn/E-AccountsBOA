@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Account List</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 30px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    #addForm {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      background: #f8f8f8;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #aaa;
+    }
+
+    button {
+      background: #0a7cff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #005fcc;
+    }
+
+    .nameItem {
+      padding: 12px;
+      background: #f2f2f2;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: 0.2s;
+    }
+
+    .nameItem:hover {
+      background: #dbe8ff;
+      color: #0044aa;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Account List</h1>
+
+<button id="showFormBtn">Add an Account</button>
+
+<!-- Hidden Form -->
+<div id="addForm">
+  <h3>Add Account</h3>
+  <input type="text" id="name" placeholder="Full Name">
+  <input type="text" id="bank" placeholder="Bank Name">
+  <input type="text" id="account" placeholder="Account Number">
+  <button id="saveBtn">Save</button>
+</div>
+
+<h2>Names</h2>
+<div id="namesList"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+
+<script>
+    require('dotenv').config();
+  
+  const firebaseConfig = {
+    apiKey: process.env.API_KEY,
+    authDomain: process.env.AUTH_DOMAIN,
+    projectId: process.env.PROJECT_ID,
+    storageBucket: process.env.STORAGE_BUCKET,
+    messagingSenderId: process.env.MESSAGE_SENDER_ID,
+    appId: process.env.APP_ID,
+    measurementId: process.env.MEASUREMENT_ID
+  };
+
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const namesList = document.getElementById("namesList");
+  const showFormBtn = document.getElementById("showFormBtn");
+  const addForm = document.getElementById("addForm");
+  const saveBtn = document.getElementById("saveBtn");
+
+
+  showFormBtn.onclick = () => {
+    addForm.style.display = addForm.style.display === "none" ? "block" : "none";
+  };
+
+
+  saveBtn.onclick = async () => {
+    const name = document.getElementById("name").value.trim();
+    const bank = document.getElementById("bank").value.trim();
+    const account = document.getElementById("account").value.trim();
+
+    if (!name || !bank || !account) {
+      alert("Please fill all fields.");
+      return;
+    }
+
+    await db.collection("accounts").add({
+      name,
+      bank,
+      account
+    });
+
+    document.getElementById("name").value = "";
+    document.getElementById("bank").value = "";
+    document.getElementById("account").value = "";
+    addForm.style.display = "none";
+  };
+
+
+  db.collection("accounts").orderBy("name").onSnapshot((snapshot) => {
+    namesList.innerHTML = "";
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+
+      const item = document.createElement("div");
+      item.className = "nameItem";
+      item.textContent = data.name;
+
+      item.onclick = () => {
+        navigator.clipboard.writeText(data.account);
+        alert(`Copied account number for ${data.name}`);
+      };
+
+      namesList.appendChild(item);
+    });
+  });
+</script>
+
+</body>
+</html>
