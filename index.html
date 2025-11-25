@@ -98,8 +98,7 @@
   };
 
 
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+
 
   const namesList = document.getElementById("namesList");
   const showFormBtn = document.getElementById("showFormBtn");
@@ -107,9 +106,13 @@
   const saveBtn = document.getElementById("saveBtn");
 
 
-  showFormBtn.onclick = () => {
-    addForm.style.display = addForm.style.display === "none" ? "block" : "none";
-  };
+ showFormBtn.addEventListener("click", () => {
+  if (addForm.style.display === "" || addForm.style.display === "none") {
+    addForm.style.display = "block";
+  } else {
+    addForm.style.display = "none";
+  }
+});
 
 
   saveBtn.onclick = async () => {
