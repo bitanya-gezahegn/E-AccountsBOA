@@ -1,0 +1,9 @@
+{
+  "name": "account-backend",
+  "version": "1.0.0",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^12.7.0"
+  }
+}
