@@ -47,11 +47,11 @@ saveBtn.onclick = async () => {
   //const bank = document.getElementById("bank").value.trim();
   const account = document.getElementById("account").value.trim();
 
-  if (!name || !bank || !account) { alert("Fill all fields"); return; }
+  if (!name || !account) { alert("Fill all fields"); return; }
 
   await fetch(`${BACKEND_URL}/api/addAccount`, {
     method: "POST",
-    body: JSON.stringify({ name, bank, account }),
+    body: JSON.stringify({ name, account }),
     headers: { "Content-Type": "application/json" }
   });
 
