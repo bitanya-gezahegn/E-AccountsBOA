@@ -3,15 +3,12 @@ require("dotenv").config();
 
 if (!admin.apps.length) {
   admin.initializeApp({
-  apiKey: process.env.API_KEY,
-  authDomain: process.env.AUTH_DOMAIN,
-  projectId: process.env.PROJECT_ID,
-  storageBucket: process.env.STORAGE_BUCKET,
-  messagingSenderId: process.env.MESSAGING_SENDER_ID,
-  appId: process.env.APP_ID,
-  measurementId: process.env.MEASUREMENT_ID
-     
-    });
+    credential: admin.credential.cert({
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    })
+  });
 }
 
 const db = admin.firestore();
@@ -19,7 +16,7 @@ const db = admin.firestore();
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
-  const { name, bank, account } = req.body;
+  const { name, account } = req.body;
 
   if (!name || !account) return res.status(400).send("Missing fields");
 
