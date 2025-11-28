@@ -22,7 +22,7 @@
 <div id="addForm">
   <h3>Add Account</h3>
   <input type="text" id="name" placeholder="Full Name">
-  <!-- <input type="text" id="bank" placeholder="Bank Name"> -->
+
   <input type="text" id="account" placeholder="Account Number">
   <button id="saveBtn">Save</button>
 </div>
@@ -44,19 +44,28 @@ showFormBtn.addEventListener("click", () => {
 
 saveBtn.onclick = async () => {
   const name = document.getElementById("name").value.trim();
-  //const bank = document.getElementById("bank").value.trim();
+
   const account = document.getElementById("account").value.trim();
 
   if (!name || !account) { alert("Fill all fields"); return; }
+
 
   await fetch(`${BACKEND_URL}/api/addAccount`, {
     method: "POST",
     body: JSON.stringify({ name, account }),
     headers: { "Content-Type": "application/json" }
   });
+  const data = await response.json();
+
+if (!response.ok) {
+  alert(data.error);
+  return;
+}
+
+alert("Account added!");
 
   document.getElementById("name").value = "";
-  //document.getElementById("bank").value = "";
+  
   document.getElementById("account").value = "";
   addForm.style.display = "none";
 
