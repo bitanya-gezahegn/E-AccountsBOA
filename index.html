@@ -1,97 +1,382 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Account List</title>
   <style>
-    body { font-family: Arial; max-width: 600px; margin: 30px auto; padding: 20px; line-height:1.6; }
-    h1 { text-align:center; }
-    #addForm { display:none; margin-top:20px; padding:15px; border:1px solid #ccc; border-radius:10px; background:#f8f8f8; }
-    input, button { width:95%; padding:12px; margin:8px 0; font-size:16px; border-radius:8px; border:1px solid #aaa; }
-    button { background:#0a7cff; color:white; border:none; cursor:pointer; font-weight:bold; }
-    button:hover { background:#005fcc; }
-    .nameItem { padding:12px; background:#f2f2f2; margin-bottom:8px; border-radius:8px; cursor:pointer; font-size:18px; transition:0.2s; }
-    .nameItem:hover { background:#dbe8ff; color:#0044aa; }
+    :root {
+      --primary: #0a7cff;
+      --muted: #f2f2f2;
+      --accent: #dbe8ff;
+      --success: #28a745;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; max-width: 820px; margin: 30px auto; padding: 20px; line-height:1.5; color:#222; }
+    h1 { text-align:center; margin-bottom: 6px; }
+    .topbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .controls { display:flex; gap:8px; align-items:center; }
+
+    /* Buttons & inputs */
+    button { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    button:disabled { background:#8cbcff; cursor:not-allowed; }
+    input[type="text"], .search { padding:10px; border-radius:8px; border:1px solid #ccc; font-size:14px; }
+    .search { width:320px; }
+
+    /* Modal */
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:60; }
+    .modal { background:#fff; padding:18px; border-radius:10px; width:90%; max-width:420px; box-shadow:0 8px 30px rgba(0,0,0,0.2); }
+    .modal h3 { margin-top:0; }
+    .modal .close { background:transparent; color:#666; border:none; font-size:18px; position:absolute; right:18px; top:12px; cursor:pointer; }
+
+    /* Spinner */
+    .spinner { border:4px solid #f3f3f3; border-top:4px solid var(--primary); border-radius:50%; width:26px; height:26px; animation:spin 1s linear infinite; display:inline-block; }
+    @keyframes spin { 0%{transform:rotate(0);}100%{transform:rotate(360deg);} }
+
+    /* List */
+    #namesList { margin-top:12px; min-height:80px; }
+    .nameItem { padding:12px; background:var(--muted); margin-bottom:8px; border-radius:8px; cursor:pointer; font-size:17px; transition:all .15s; display:flex; align-items:center; justify-content:space-between; }
+    .nameItem:hover { background:var(--accent); color:#0044aa; transform:translateY(-2px); }
+    .name-left { display:flex; gap:12px; align-items:center; flex:1; }
+    .copied-badge { font-size:12px; color:#fff; background:var(--success); padding:4px 8px; border-radius:999px; display:none; margin-left:8px; }
+
+    /* Pagination */
+    .pager { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; }
+    .page-info { font-size:14px; color:#555; }
+
+    /* Toast */
+    .toast-wrap { position:fixed; top:18px; right:18px; z-index:80; display:flex; flex-direction:column; gap:8px; }
+    .toast { min-width:220px; background:#222; color:#fff; padding:10px 14px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.2); opacity:0; transform:translateY(-6px); transition:all .25s ease; }
+    .toast.show { opacity:1; transform:translateY(0); }
+    .toast.success { background:var(--success); color:#fff; }
+    .toast.error { background:#c0392b; }
+
+    /* small helpers */
+    .muted { color:#666; font-size:14px; }
+    .center { text-align:center; }
+    .sr-only { position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
   </style>
 </head>
 <body>
 
-<h1>Account List</h1>
-<button id="showFormBtn">Add an Account</button>
+  <h1>Account List</h1>
 
-<div id="addForm">
-  <h3>Add Account</h3>
-  <input type="text" id="name" placeholder="Full Name">
+  <div class="topbar">
+    <div class="controls">
+      <input id="searchInput" class="search" type="text" placeholder="Search by name or account..." />
+      <div id="globalSpinner" style="display:none; align-items:center;"><span class="spinner"></span></div>
+    </div>
 
-  <input type="text" id="account" placeholder="Account Number">
-  <button id="saveBtn">Save</button>
-</div>
+    <div>
+      <button id="openAddBtn">Add an Account</button>
+    </div>
+  </div>
 
-<h2>Names</h2>
-<div id="namesList"></div>
+  <div id="namesList" aria-live="polite"></div>
+
+  <div class="pager" id="pager">
+    <button id="prevBtn">◀ Prev</button>
+    <div class="page-info" id="pageInfo">Page 1</div>
+    <button id="nextBtn">Next ▶</button>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <button class="close" id="closeModalBtn" aria-label="Close">✕</button>
+      <h3>Add Account</h3>
+      <div>
+        <label class="sr-only" for="name">Full name</label>
+        <input id="nameField" type="text" placeholder="Full name" />
+      </div>
+      <div style="margin-top:8px;">
+        <label class="sr-only" for="accountField">Account number</label>
+        <input id="accountField" type="text" placeholder="Account number" />
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+        <button id="submitBtn">Save</button>
+        <div id="submitSpinner" style="display:none;"><span class="spinner"></span></div>
+      </div>
+      <p class="muted" style="margin-top:8px; font-size:13px;">Names and accounts are case-insensitively unique.</p>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="true"></div>
 
 <script>
-const BACKEND_URL = "https://e-accounts-boa.vercel.app/"; 
+/* =========================
+   Configuration
+   ========================= */
+const BACKEND_URL = "https://e-accounts-boa.vercel.app"; // <-- replace if needed
+const PAGE_SIZE = 10;
 
+/* =========================
+   State
+   ========================= */
+let accounts = [];         // full fetched list
+let filtered = [];         // filtered list (after search)
+let currentPage = 1;
+
+/* =========================
+   Elements
+   ========================= */
 const namesList = document.getElementById("namesList");
-const showFormBtn = document.getElementById("showFormBtn");
-const addForm = document.getElementById("addForm");
-const saveBtn = document.getElementById("saveBtn");
+const searchInput = document.getElementById("searchInput");
+const globalSpinner = document.getElementById("globalSpinner");
+const pager = document.getElementById("pager");
+const pageInfo = document.getElementById("pageInfo");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
 
-showFormBtn.addEventListener("click", () => {
-  addForm.style.display = addForm.style.display === "block" ? "none" : "block";
+const modalBackdrop = document.getElementById("modalBackdrop");
+const openAddBtn = document.getElementById("openAddBtn");
+const closeModalBtn = document.getElementById("closeModalBtn");
+const nameField = document.getElementById("nameField");
+const accountField = document.getElementById("accountField");
+const submitBtn = document.getElementById("submitBtn");
+const submitSpinner = document.getElementById("submitSpinner");
+
+const toastWrap = document.getElementById("toastWrap");
+
+/* =========================
+   Utility: Toast
+   ========================= */
+function showToast(message, type = "success", timeout = 3000) {
+  const t = document.createElement("div");
+  t.className = `toast ${type === "success" ? "success" : "error"} show`;
+  t.textContent = message;
+  toastWrap.appendChild(t);
+  // animate in
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => {
+    t.classList.remove("show");
+    setTimeout(() => t.remove(), 250);
+  }, timeout);
+}
+
+/* =========================
+   Modal behavior
+   ========================= */
+function openModal() {
+  modalBackdrop.style.display = "flex";
+  modalBackdrop.setAttribute("aria-hidden", "false");
+  nameField.focus();
+  // trap focus simple
+}
+function closeModal() {
+  modalBackdrop.style.display = "none";
+  modalBackdrop.setAttribute("aria-hidden", "true");
+  nameField.value = "";
+  accountField.value = "";
+}
+openAddBtn.addEventListener("click", openModal);
+closeModalBtn.addEventListener("click", closeModal);
+modalBackdrop.addEventListener("click", (e) => {
+  if (e.target === modalBackdrop) closeModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
 });
 
-saveBtn.onclick = async () => {
-  const name = document.getElementById("name").value.trim();
-
-  const account = document.getElementById("account").value.trim();
-
-  if (!name || !account) { alert("Fill all fields"); return; }
-
-
-  await fetch(`${BACKEND_URL}/api/addAccount`, {
-    method: "POST",
-    body: JSON.stringify({ name, account }),
-    headers: { "Content-Type": "application/json" }
-  });
-  const data = await response.json();
-
-if (!response.ok) {
-  alert(data.error);
-  return;
+/* =========================
+   Fetch & caching
+   ========================= */
+async function fetchAccounts() {
+  globalSpinner.style.display = "inline-flex";
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/getAccounts`);
+    if (!res.ok) throw new Error("Failed to fetch");
+    const data = await res.json();
+    // keep original ordering by nameLower if available, else by name
+    accounts = data.map(d => {
+      return {
+        ...d,
+        nameLower: (d.nameLower || d.name || "").toString().toLowerCase().trim(),
+        accountLower: (d.accountLower || d.account || "").toString().toLowerCase().trim()
+      };
+    });
+    // initial filtered = accounts
+    filtered = accounts.slice();
+    currentPage = 1;
+    renderPage();
+  } catch (err) {
+    namesList.innerHTML = "<div class='muted center'>Failed to load accounts.</div>";
+    console.error(err);
+  } finally {
+    globalSpinner.style.display = "none";
+  }
 }
 
-alert("Account added!");
+/* =========================
+   Rendering / Pagination
+   ========================= */
+function renderPage() {
+  // calculate pages
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
 
-  document.getElementById("name").value = "";
-  
-  document.getElementById("account").value = "";
-  addForm.style.display = "none";
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
-  loadAccounts();
-};
-
-async function loadAccounts() {
-  const res = await fetch(`${BACKEND_URL}/api/getAccounts`);
-  const data = await res.json();
+  // clear list
   namesList.innerHTML = "";
 
-  data.forEach(entry => {
-    const item = document.createElement("div");
-    item.className = "nameItem";
-    item.textContent = entry.name;
-    item.onclick = () => {
-      navigator.clipboard.writeText(entry.account);
-      alert(`Copied account number for ${entry.name}`);
-    };
-    namesList.appendChild(item);
-  });
+  if (pageItems.length === 0) {
+    namesList.innerHTML = "<div class='muted center'>No accounts found.</div>";
+  } else {
+    for (const entry of pageItems) {
+      const item = document.createElement("div");
+      item.className = "nameItem";
+
+      const left = document.createElement("div");
+      left.className = "name-left";
+      left.textContent = entry.name;
+
+      const right = document.createElement("div");
+      right.style.display = "flex";
+      right.style.alignItems = "center";
+
+      const badge = document.createElement("div");
+      badge.className = "copied-badge";
+      badge.textContent = "Copied";
+
+      right.appendChild(badge);
+
+      item.appendChild(left);
+      item.appendChild(right);
+
+      // click to copy
+      item.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(entry.account);
+          // show small feedback badge
+          badge.style.display = "inline-block";
+          setTimeout(() => badge.style.display = "none", 1200);
+          showToast(`Copied account for ${entry.name}`, "success", 1600);
+        } catch (err) {
+          showToast("Copy failed", "error", 2000);
+        }
+      });
+
+      namesList.appendChild(item);
+    }
+  }
+
+  // update pager UI
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages} · ${total} total`;
+  prevBtn.disabled = currentPage <= 1;
+  nextBtn.disabled = currentPage >= totalPages;
 }
 
-loadAccounts();
-setInterval(loadAccounts, 5000);
-</script>
+/* pager handlers */
+prevBtn.addEventListener("click", () => {
+  if (currentPage > 1) { currentPage--; renderPage(); window.scrollTo({top:0, behavior:'smooth'}); }
+});
+nextBtn.addEventListener("click", () => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage < totalPages) { currentPage++; renderPage(); window.scrollTo({top:0, behavior:'smooth'}); }
+});
 
+/* =========================
+   Search (debounced)
+   ========================= */
+let searchTimeout = null;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const q = searchInput.value.toLowerCase().trim();
+    if (!q) {
+      filtered = accounts.slice();
+    } else {
+      filtered = accounts.filter(a =>
+        a.nameLower.includes(q) || a.accountLower.includes(q)
+      );
+    }
+    currentPage = 1;
+    renderPage();
+  }, 200); // 200ms debounce
+});
+
+/* =========================
+   Submit (Add account) with optimistic UI refresh
+   ========================= */
+submitBtn.addEventListener("click", async () => {
+  const name = nameField.value.trim();
+  const account = accountField.value.trim();
+
+  if (!name || !account) {
+    showToast("Fill all fields", "error");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitSpinner.style.display = "inline-block";
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/addAccount`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, account })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || "Failed to add", "error");
+      return;
+    }
+
+    // success — optionally we can optimistic-add locally for instant UX
+    // normalize and add to front of accounts
+    const newEntry = {
+      id: data.id || ("local-" + Date.now()),
+      name,
+      account,
+      nameLower: name.toLowerCase().trim(),
+      accountLower: account.toLowerCase().trim()
+    };
+    accounts.unshift(newEntry);
+    filtered = accounts.slice();
+    currentPage = 1;
+    renderPage();
+
+    showToast("Account added", "success");
+    closeModal();
+  } catch (err) {
+    console.error(err);
+    showToast("Network error", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitSpinner.style.display = "none";
+  }
+});
+
+/* =========================
+   Initial load
+   ========================= */
+fetchAccounts();
+
+/* Optional: refresh in background every 60s (non-blocking) */
+setInterval(async () => {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/getAccounts`);
+    if (!res.ok) return;
+    const data = await res.json();
+    // quick equality check by length — if changed, replace and re-render
+    if (data.length !== accounts.length) {
+      accounts = data.map(d => ({
+        ...d,
+        nameLower: (d.nameLower || d.name || "").toLowerCase().trim(),
+        accountLower: (d.accountLower || d.account || "").toLowerCase().trim()
+      }));
+      filtered = accounts.slice();
+      renderPage();
+    }
+  } catch (e) {
+    /* ignore background errors */
+  }
+}, 60000);
+
+</script>
 </body>
 </html>
