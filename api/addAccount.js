@@ -21,10 +21,10 @@ module.exports = async (req, res) => {
 
   const { name, bank, account } = req.body;
 
-  if (!name || !bank || !account) return res.status(400).send("Missing fields");
+  if (!name || !account) return res.status(400).send("Missing fields");
 
   try {
-    await db.collection("accounts").add({ name, bank, account });
+    await db.collection("accounts").add({ name,account });
     res.json({ success: true });
   } catch (err) {
     res.status(500).send(err.message);
